@@ -47,6 +47,20 @@ public class GlobalExceptionHandler {
         );
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
     }
+    @ExceptionHandler(TestPublishValidationException.class)
+    public ResponseEntity<ApiErrorResponse> handleTestPublishValidationException(TestPublishValidationException ex) {
+        List<ApiErrorResponse.FieldErrorDetail> fieldErrors = new ArrayList<>();
+        for (String problem : ex.getProblems()) {
+            fieldErrors.add(new ApiErrorResponse.FieldErrorDetail("publish", problem));
+        }
+        ApiErrorResponse response = new ApiErrorResponse(
+                HttpStatus.BAD_REQUEST.value(),
+                ex.getMessage(),
+                fieldErrors
+        );
+        response.setProblems(ex.getProblems());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+    }
 
     @ExceptionHandler(ScannedPdfException.class)
     public ResponseEntity<ApiErrorResponse> handleScannedPdfException(ScannedPdfException ex) {

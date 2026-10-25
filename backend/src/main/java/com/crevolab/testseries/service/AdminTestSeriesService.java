@@ -10,6 +10,7 @@ import com.crevolab.testseries.dto.admin.TestRequestDto;
 import com.crevolab.testseries.dto.admin.TestResponseDto;
 import com.crevolab.testseries.domain.enums.TestStatus;
 import com.crevolab.testseries.exception.ResourceNotFoundException;
+import com.crevolab.testseries.exception.TestPublishValidationException;
 import com.crevolab.testseries.repository.AttemptRepository;
 import com.crevolab.testseries.repository.QuestionRepository;
 import com.crevolab.testseries.repository.TestSeriesRepository;
@@ -63,7 +64,41 @@ public class AdminTestSeriesService {
     public TestResponseDto publishTest(Long id) {
         TestSeries test = testSeriesRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Test not found with id: " + id));
+
+        List<String> problems = new ArrayList<>();
+
+        if (test.getDurationMinutes() == null || test.getDurationMinutes() <= 0) {
+            problems.add("Test duration must be greater than 0 minutes");
+        }
+
+        if (test.getAccessType() == AccessType.PAID && (test.getPrice() == null || test.getPrice().compareTo(BigDecimal.ZERO) <= 0)) {
+            problems.add("Paid test must have a price greater than 0.00");
+        }
+
+        List<Question> questions = questionRepository.findByTestIdOrderByOrderNoAsc(test.getId());
+        if (questions == null || questions.isEmpty()) {
+            problems.add("Test must have at least one question to be published");
+        } else {
+            for (Question q : questions) {
+                if (q.getCorrectOption() == null || q.getCorrectOption().trim().isEmpty()) {
+                    problems.add("Question " + q.getOrderNo() + " has no correct answer");
+                }
+            }
+        }
+
+        if (!problems.isEmpty()) {
+            throw new TestPublishValidationException(problems);
+        }
+
         test.setStatus(TestStatus.PUBLISHED);
+        TestSeries updated = testSeriesRepository.save(test);
+        return TestResponseDto.fromEntity(updated);
+    }
+
+    public TestResponseDto unpublishTest(Long id) {
+        TestSeries test = testSeriesRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Test not found with id: " + id));
+        test.setStatus(TestStatus.DRAFT);
         TestSeries updated = testSeriesRepository.save(test);
         return TestResponseDto.fromEntity(updated);
     }

@@ -67,7 +67,14 @@ export const adminApi = {
 
   async publishTest(id: number): Promise<TestSeries> {
     const res = await fetch(`/api/admin/tests/${id}/publish`, {
-      method: 'PATCH',
+      method: 'POST',
+    });
+    return handleResponse<TestSeries>(res);
+  },
+
+  async unpublishTest(id: number): Promise<TestSeries> {
+    const res = await fetch(`/api/admin/tests/${id}/unpublish`, {
+      method: 'POST',
     });
     return handleResponse<TestSeries>(res);
   },

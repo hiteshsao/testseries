@@ -15,6 +15,7 @@ public class ApiErrorResponse {
     private String code;
     private String errorCode;
     private List<FieldErrorDetail> errors;
+    private List<String> problems;
 
     public ApiErrorResponse() {
     }
@@ -85,6 +86,14 @@ public class ApiErrorResponse {
 
     public void setErrors(List<FieldErrorDetail> errors) {
         this.errors = errors;
+    }
+
+    public List<String> getProblems() {
+        return problems;
+    }
+
+    public void setProblems(List<String> problems) {
+        this.problems = problems;
     }
 
     public static class FieldErrorDetail {

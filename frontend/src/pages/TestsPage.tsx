@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { adminApi } from '../api/adminApi';
+import { adminApi, ApiError } from '../api/adminApi';
 import { TestSeries } from '../types';
+import { PublishProblemsModal } from '../components/PublishProblemsModal';
 import {
   PlusCircle,
   RefreshCw,
@@ -13,9 +14,11 @@ import {
   Filter,
   FileQuestion,
   AlertCircle,
+  AlertTriangle,
   CheckCircle2,
   Clock,
   FileText,
+  Eye,
   X
 } from 'lucide-react';
 
@@ -27,6 +30,18 @@ export const TestsPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'DRAFT' | 'PUBLISHED'>('ALL');
   const [actionFeedback, setActionFeedback] = useState<{ id: number; message: string; type: 'success' | 'error' } | null>(null);
   const [publishingId, setPublishingId] = useState<number | null>(null);
+  const [unpublishingId, setUnpublishingId] = useState<number | null>(null);
+
+  // Publish failure problem modal state
+  const [problemModal, setProblemModal] = useState<{
+    isOpen: boolean;
+    problems: string[];
+    testTitle?: string;
+    testId?: number;
+  }>({
+    isOpen: false,
+    problems: [],
+  });
 
   // DEMO-ONLY: Debug raw text modal state
   const [debugModal, setDebugModal] = useState<{
@@ -91,27 +106,62 @@ export const TestsPage: React.FC = () => {
     fetchTests();
   }, []);
 
-  const handlePublish = async (testId: number) => {
-    setPublishingId(testId);
+  const handlePublish = async (test: TestSeries) => {
+    setPublishingId(test.id);
     setActionFeedback(null);
     try {
-      const updated = await adminApi.publishTest(testId);
+      const updated = await adminApi.publishTest(test.id);
       setTests((prev) =>
-        prev.map((t) => (t.id === testId ? updated : t))
+        prev.map((t) => (t.id === test.id ? updated : t))
       );
       setActionFeedback({
-        id: testId,
+        id: test.id,
         message: `Test "${updated.title}" is now PUBLISHED and live!`,
         type: 'success',
       });
     } catch (err: any) {
+      if (err instanceof ApiError && err.response?.problems && err.response.problems.length > 0) {
+        setProblemModal({
+          isOpen: true,
+          problems: err.response.problems,
+          testTitle: test.title,
+          testId: test.id,
+        });
+      } else {
+        const msg = err?.response?.message || err?.message || 'Failed to publish test.';
+        setProblemModal({
+          isOpen: true,
+          problems: [msg],
+          testTitle: test.title,
+          testId: test.id,
+        });
+      }
+    } finally {
+      setPublishingId(null);
+    }
+  };
+
+  const handleUnpublish = async (test: TestSeries) => {
+    setUnpublishingId(test.id);
+    setActionFeedback(null);
+    try {
+      const updated = await adminApi.unpublishTest(test.id);
+      setTests((prev) =>
+        prev.map((t) => (t.id === test.id ? updated : t))
+      );
       setActionFeedback({
-        id: testId,
-        message: err?.response?.message || 'Failed to publish test.',
+        id: test.id,
+        message: `Test "${updated.title}" is now unpublished (DRAFT).`,
+        type: 'success',
+      });
+    } catch (err: any) {
+      setActionFeedback({
+        id: test.id,
+        message: err?.response?.message || 'Failed to unpublish test.',
         type: 'error',
       });
     } finally {
-      setPublishingId(null);
+      setUnpublishingId(null);
     }
   };
 
@@ -282,6 +332,17 @@ export const TestsPage: React.FC = () => {
                     </td>
                     <td>
                       <div className="action-buttons-group" style={{ justifyContent: 'flex-end' }}>
+                        {/* 0. Preview Test Action */}
+                        <Link
+                          to={`/tests/${test.id}/preview`}
+                          className="btn-sm btn-action-ghost"
+                          title="Preview test in student-like read-only format"
+                          id={`btn-preview-test-${test.id}`}
+                        >
+                          <Eye size={13} />
+                          <span>Preview</span>
+                        </Link>
+
                         {/* 1. Upload PDF Action */}
                         <Link
                           to={`/tests/${test.id}/upload`}
@@ -315,27 +376,32 @@ export const TestsPage: React.FC = () => {
                           <span>Edit Questions</span>
                         </Link>
 
-                        {/* 3. Publish Action */}
+                        {/* 3. Publish / Unpublish Action */}
                         {test.status === 'DRAFT' ? (
                           <button
                             type="button"
                             className="btn-sm btn-action-publish"
                             disabled={publishingId === test.id}
-                            onClick={() => handlePublish(test.id)}
+                            onClick={() => handlePublish(test)}
                             title="Publish this test series"
+                            id={`btn-publish-test-${test.id}`}
                           >
                             <CheckCircle size={13} />
                             <span>{publishingId === test.id ? 'Publishing...' : 'Publish'}</span>
                           </button>
                         ) : (
-                          <span
-                            className="btn-sm"
-                            style={{ backgroundColor: 'rgba(16, 185, 129, 0.08)', color: '#34d399', cursor: 'default' }}
-                            title="Test is already live"
+                          <button
+                            type="button"
+                            className="btn-sm btn-action-ghost"
+                            style={{ color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.3)' }}
+                            disabled={unpublishingId === test.id}
+                            onClick={() => handleUnpublish(test)}
+                            title="Unpublish this test back to DRAFT"
+                            id={`btn-unpublish-test-${test.id}`}
                           >
-                            <CheckCircle size={13} />
-                            <span>Live</span>
-                          </span>
+                            <AlertTriangle size={13} />
+                            <span>{unpublishingId === test.id ? 'Unpublishing...' : 'Unpublish'}</span>
+                          </button>
                         )}
 
                         {/* 4. Results Action */}
@@ -489,6 +555,15 @@ export const TestsPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Publish Failure Problems Modal */}
+      <PublishProblemsModal
+        isOpen={problemModal.isOpen}
+        onClose={() => setProblemModal((prev) => ({ ...prev, isOpen: false }))}
+        problems={problemModal.problems}
+        testTitle={problemModal.testTitle}
+        testId={problemModal.testId}
+      />
     </div>
   );
 };

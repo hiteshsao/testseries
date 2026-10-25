@@ -1,13 +1,15 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { useParams, Link } from 'react-router-dom';
-import { adminApi } from '../api/adminApi';
+import { adminApi, ApiError } from '../api/adminApi';
 import { TestSeries, Question, QuestionRequest } from '../types';
+import { PublishProblemsModal } from '../components/PublishProblemsModal';
 import {
   FileQuestion,
   PlusCircle,
   Save,
   Trash2,
   AlertTriangle,
+  CheckCircle,
   CheckCircle2,
   ArrowLeft,
   Upload,
@@ -17,7 +19,8 @@ import {
   Check,
   X,
   Sparkles,
-  HelpCircle
+  HelpCircle,
+  Eye
 } from 'lucide-react';
 
 interface Toast {
@@ -103,6 +106,17 @@ export const QuestionsReviewPage: React.FC = () => {
 
   // Toast notification state
   const [toasts, setToasts] = useState<Toast[]>([]);
+  const [isPublishing, setIsPublishing] = useState<boolean>(false);
+  const [isUnpublishing, setIsUnpublishing] = useState<boolean>(false);
+
+  // Publish problem modal state
+  const [problemModal, setProblemModal] = useState<{
+    isOpen: boolean;
+    problems: string[];
+  }>({
+    isOpen: false,
+    problems: [],
+  });
 
   const showToast = (message: string, type: 'success' | 'error' | 'info' = 'success') => {
     const toastId = Math.random().toString(36).substring(2, 9);
@@ -114,6 +128,45 @@ export const QuestionsReviewPage: React.FC = () => {
 
   const removeToast = (toastId: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== toastId));
+  };
+
+  const handlePublish = async () => {
+    if (!test) return;
+    setIsPublishing(true);
+    try {
+      const updated = await adminApi.publishTest(test.id);
+      setTest(updated);
+      showToast(`Test "${updated.title}" is now PUBLISHED and live!`, 'success');
+    } catch (err: any) {
+      if (err instanceof ApiError && err.response?.problems && err.response.problems.length > 0) {
+        setProblemModal({
+          isOpen: true,
+          problems: err.response.problems,
+        });
+      } else {
+        const msg = err?.response?.message || err?.message || 'Failed to publish test.';
+        setProblemModal({
+          isOpen: true,
+          problems: [msg],
+        });
+      }
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+  const handleUnpublish = async () => {
+    if (!test) return;
+    setIsUnpublishing(true);
+    try {
+      const updated = await adminApi.unpublishTest(test.id);
+      setTest(updated);
+      showToast(`Test "${updated.title}" unpublished and moved back to DRAFT.`, 'success');
+    } catch (err: any) {
+      showToast(err?.response?.message || err?.message || 'Failed to unpublish test.', 'error');
+    } finally {
+      setIsUnpublishing(false);
+    }
   };
 
   // Fetch test details & questions
@@ -452,10 +505,37 @@ export const QuestionsReviewPage: React.FC = () => {
           </p>
         </div>
 
-        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '0.75rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <Link to={`/tests/${testId}/preview`} className="btn-secondary" style={{ textDecoration: 'none' }} id="btn-header-preview-test">
+            <Eye size={15} /> Preview Test
+          </Link>
           <Link to={`/tests/${testId}/upload`} className="btn-secondary" style={{ textDecoration: 'none' }}>
             <Upload size={15} /> Upload PDF
           </Link>
+          {test.status === 'DRAFT' ? (
+            <button
+              type="button"
+              className="btn-primary"
+              onClick={handlePublish}
+              disabled={isPublishing}
+              id="btn-header-publish"
+            >
+              <CheckCircle size={15} />
+              <span>{isPublishing ? 'Publishing...' : 'Publish Test'}</span>
+            </button>
+          ) : (
+            <button
+              type="button"
+              className="btn-secondary"
+              onClick={handleUnpublish}
+              disabled={isUnpublishing}
+              style={{ color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.4)' }}
+              id="btn-header-unpublish"
+            >
+              <AlertTriangle size={15} />
+              <span>{isUnpublishing ? 'Unpublishing...' : 'Unpublish'}</span>
+            </button>
+          )}
           <Link to="/tests" className="btn-secondary" style={{ textDecoration: 'none' }}>
             <ArrowLeft size={15} /> Back to Tests
           </Link>
@@ -1007,7 +1087,15 @@ export const QuestionsReviewPage: React.FC = () => {
             )}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+            <Link
+              to={`/tests/${testId}/preview`}
+              className="btn-secondary"
+              style={{ textDecoration: 'none' }}
+              id="btn-sticky-preview"
+            >
+              <Eye size={14} /> Preview
+            </Link>
             <button
               type="button"
               className="btn-secondary"
@@ -1022,6 +1110,30 @@ export const QuestionsReviewPage: React.FC = () => {
             >
               <PlusCircle size={15} /> Add Question
             </button>
+            {test.status === 'DRAFT' ? (
+              <button
+                type="button"
+                className="btn-primary"
+                onClick={handlePublish}
+                disabled={isPublishing}
+                id="btn-sticky-publish"
+              >
+                <CheckCircle size={14} />
+                <span>{isPublishing ? 'Publishing...' : 'Publish'}</span>
+              </button>
+            ) : (
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={handleUnpublish}
+                disabled={isUnpublishing}
+                style={{ color: '#f87171', borderColor: 'rgba(239, 68, 68, 0.4)' }}
+                id="btn-sticky-unpublish"
+              >
+                <AlertTriangle size={14} />
+                <span>{isUnpublishing ? 'Unpublishing...' : 'Unpublish'}</span>
+              </button>
+            )}
             <Link to="/tests" className="btn-secondary" style={{ textDecoration: 'none' }}>
               Done / Back to Tests
             </Link>
@@ -1464,6 +1576,15 @@ export const QuestionsReviewPage: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Publish Problems Modal */}
+      <PublishProblemsModal
+        isOpen={problemModal.isOpen}
+        onClose={() => setProblemModal((prev) => ({ ...prev, isOpen: false }))}
+        problems={problemModal.problems}
+        testTitle={test?.title}
+        testId={test?.id}
+      />
     </div>
   );
 };

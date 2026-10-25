@@ -54,9 +54,24 @@ public class AdminTestSeriesController {
         return ResponseEntity.noContent().build();
     }
 
+    @PostMapping("/{id}/publish")
+    public ResponseEntity<TestResponseDto> publishTestPost(@PathVariable Long id) {
+        return ResponseEntity.ok(adminTestSeriesService.publishTest(id));
+    }
+
     @PatchMapping("/{id}/publish")
     public ResponseEntity<TestResponseDto> publishTest(@PathVariable Long id) {
         return ResponseEntity.ok(adminTestSeriesService.publishTest(id));
+    }
+
+    @PostMapping("/{id}/unpublish")
+    public ResponseEntity<TestResponseDto> unpublishTestPost(@PathVariable Long id) {
+        return ResponseEntity.ok(adminTestSeriesService.unpublishTest(id));
+    }
+
+    @PatchMapping("/{id}/unpublish")
+    public ResponseEntity<TestResponseDto> unpublishTest(@PathVariable Long id) {
+        return ResponseEntity.ok(adminTestSeriesService.unpublishTest(id));
     }
 
     @PostMapping(value = "/{id}/upload-pdf", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

@@ -47,6 +47,7 @@ export interface ApiErrorResponse {
   code?: string;
   errorCode?: string;
   errors?: ApiFieldError[];
+  problems?: string[];
 }
 
 export interface ParseResult {
