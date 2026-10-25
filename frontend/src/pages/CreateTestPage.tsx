@@ -8,7 +8,8 @@ import {
   CheckCircle2,
   ShieldAlert,
   ArrowLeft,
-  ListOrdered
+  ListOrdered,
+  Upload
 } from 'lucide-react';
 
 export const CreateTestPage: React.FC = () => {
@@ -28,6 +29,7 @@ export const CreateTestPage: React.FC = () => {
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [generalError, setGeneralError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [createdTestId, setCreatedTestId] = useState<number | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleChange = (
@@ -83,6 +85,7 @@ export const CreateTestPage: React.FC = () => {
       };
 
       const created = await adminApi.createTest(payload);
+      setCreatedTestId(created.id);
       setSuccessMessage(`Test "${created.title}" successfully created as DRAFT (ID: ${created.id})`);
 
       // Reset form
@@ -140,8 +143,13 @@ export const CreateTestPage: React.FC = () => {
           <div style={{ flex: 1 }}>
             <strong>Success! </strong>
             <span>{successMessage}</span>
-            <div style={{ marginTop: '0.65rem' }}>
-              <Link to="/tests" className="btn-sm btn-primary" style={{ textDecoration: 'none' }}>
+            <div style={{ marginTop: '0.65rem', display: 'flex', gap: '0.65rem', flexWrap: 'wrap' }}>
+              {createdTestId && (
+                <Link to={`/tests/${createdTestId}/upload`} className="btn-sm btn-primary" style={{ textDecoration: 'none' }}>
+                  <Upload size={14} /> Upload Question Paper PDF
+                </Link>
+              )}
+              <Link to="/tests" className="btn-sm btn-secondary" style={{ textDecoration: 'none' }}>
                 <ListOrdered size={14} /> View in Tests Table
               </Link>
             </div>

@@ -27,9 +27,6 @@ export const TestsPage: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState<'ALL' | 'DRAFT' | 'PUBLISHED'>('ALL');
   const [actionFeedback, setActionFeedback] = useState<{ id: number; message: string; type: 'success' | 'error' } | null>(null);
   const [publishingId, setPublishingId] = useState<number | null>(null);
-  const [uploadingId, setUploadingId] = useState<number | null>(null);
-  const [selectedTestForUpload, setSelectedTestForUpload] = useState<number | null>(null);
-  const fileInputRef = React.useRef<HTMLInputElement | null>(null);
 
   // DEMO-ONLY: Debug raw text modal state
   const [debugModal, setDebugModal] = useState<{
@@ -74,43 +71,6 @@ export const TestsPage: React.FC = () => {
         text: null,
         error: err?.response?.message || err?.message || 'Failed to extract text from PDF.',
       });
-    }
-  };
-
-  const handleUploadClick = (testId: number) => {
-    setSelectedTestForUpload(testId);
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-      fileInputRef.current.click();
-    }
-  };
-
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !selectedTestForUpload) return;
-
-    setUploadingId(selectedTestForUpload);
-    setActionFeedback(null);
-
-    try {
-      const updated = await adminApi.uploadPdf(selectedTestForUpload, file);
-      setTests((prev) =>
-        prev.map((t) => (t.id === selectedTestForUpload ? updated : t))
-      );
-      setActionFeedback({
-        id: selectedTestForUpload,
-        message: `PDF successfully uploaded for "${updated.title}"! (Stored at: ${updated.sourcePdfPath})`,
-        type: 'success',
-      });
-    } catch (err: any) {
-      setActionFeedback({
-        id: selectedTestForUpload,
-        message: err?.response?.message || err?.message || 'Failed to upload PDF.',
-        type: 'error',
-      });
-    } finally {
-      setUploadingId(null);
-      setSelectedTestForUpload(null);
     }
   };
 
@@ -323,16 +283,14 @@ export const TestsPage: React.FC = () => {
                     <td>
                       <div className="action-buttons-group" style={{ justifyContent: 'flex-end' }}>
                         {/* 1. Upload PDF Action */}
-                        <button
-                          type="button"
+                        <Link
+                          to={`/tests/${test.id}/upload`}
                           className="btn-sm btn-action-ghost"
-                          disabled={uploadingId === test.id}
-                          onClick={() => handleUploadClick(test.id)}
-                          title="Upload question paper PDF"
+                          title="Upload and extract questions from PDF"
                         >
-                          <Upload size={13} className={uploadingId === test.id ? 'spin' : ''} />
-                          <span>{uploadingId === test.id ? 'Uploading...' : test.sourcePdfPath ? 'Replace PDF' : 'Upload PDF'}</span>
-                        </button>
+                          <Upload size={13} />
+                          <span>{test.sourcePdfPath ? 'Replace PDF' : 'Upload PDF'}</span>
+                        </Link>
 
                         {/* DEMO-ONLY: Debug Raw Extracted Text */}
                         {test.sourcePdfPath && (
@@ -399,13 +357,6 @@ export const TestsPage: React.FC = () => {
         </div>
       </div>
 
-      <input
-        type="file"
-        ref={fileInputRef}
-        accept=".pdf,application/pdf"
-        style={{ display: 'none' }}
-        onChange={handleFileChange}
-      />
 
       {/* DEMO-ONLY: Raw Extracted Text Modal */}
       {debugModal.isOpen && (

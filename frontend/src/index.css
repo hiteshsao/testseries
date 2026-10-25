@@ -703,3 +703,82 @@ body {
   text-align: center;
   color: var(--text-secondary);
 }
+
+/* Alert Variants */
+.alert-amber {
+  background-color: rgba(245, 158, 11, 0.12);
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  color: #fcd34d;
+}
+
+.alert-info {
+  background-color: rgba(59, 130, 246, 0.12);
+  border: 1px solid rgba(59, 130, 246, 0.3);
+  color: #93c5fd;
+}
+
+/* PDF Upload Page Components */
+.upload-dropzone {
+  background: linear-gradient(180deg, rgba(17, 28, 53, 0.75) 0%, rgba(10, 17, 32, 0.85) 100%);
+  border: 2px dashed rgba(20, 184, 166, 0.35);
+  border-radius: var(--radius-lg);
+  padding: 3.5rem 2rem;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.22s ease-in-out;
+  position: relative;
+}
+
+.upload-dropzone:hover {
+  border-color: var(--teal-hover);
+  background: linear-gradient(180deg, rgba(22, 36, 68, 0.85) 0%, rgba(13, 22, 42, 0.92) 100%);
+  box-shadow: 0 0 24px rgba(20, 184, 166, 0.14);
+}
+
+.upload-dropzone.dragging {
+  border-color: var(--teal-hover);
+  background: rgba(20, 184, 166, 0.09);
+  box-shadow: 0 0 32px rgba(20, 184, 166, 0.25);
+  transform: scale(1.008);
+}
+
+.file-preview-card {
+  background-color: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  padding: 1rem 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.progress-track {
+  width: 100%;
+  height: 8px;
+  background-color: rgba(255, 255, 255, 0.08);
+  border-radius: 9999px;
+  overflow: hidden;
+  margin: 1.25rem 0 0.75rem;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--teal-primary), var(--teal-hover));
+  border-radius: 9999px;
+  transition: width 0.4s ease;
+}
+
+.warning-item {
+  background-color: rgba(245, 158, 11, 0.08);
+  border-left: 3px solid #f59e0b;
+  padding: 0.65rem 0.95rem;
+  border-radius: 4px;
+  font-size: 0.88rem;
+  color: #fef3c7;
+  margin-bottom: 0.5rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
