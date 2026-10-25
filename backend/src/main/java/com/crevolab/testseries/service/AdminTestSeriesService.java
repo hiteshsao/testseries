@@ -5,6 +5,9 @@ import com.crevolab.testseries.domain.enums.AccessType;
 import com.crevolab.testseries.dto.admin.TestRequestDto;
 import com.crevolab.testseries.dto.admin.TestResponseDto;
 import com.crevolab.testseries.exception.ResourceNotFoundException;
+import com.crevolab.testseries.domain.enums.TestStatus;
+import com.crevolab.testseries.dto.admin.AdminStatsDto;
+import com.crevolab.testseries.repository.AttemptRepository;
 import com.crevolab.testseries.repository.TestSeriesRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -18,9 +21,28 @@ import java.util.stream.Collectors;
 public class AdminTestSeriesService {
 
     private final TestSeriesRepository testSeriesRepository;
+    private final AttemptRepository attemptRepository;
 
-    public AdminTestSeriesService(TestSeriesRepository testSeriesRepository) {
+    public AdminTestSeriesService(TestSeriesRepository testSeriesRepository, AttemptRepository attemptRepository) {
         this.testSeriesRepository = testSeriesRepository;
+        this.attemptRepository = attemptRepository;
+    }
+
+    @Transactional(readOnly = true)
+    public AdminStatsDto getAdminStats() {
+        long totalTests = testSeriesRepository.count();
+        long publishedTests = testSeriesRepository.countByStatus(TestStatus.PUBLISHED);
+        long draftTests = testSeriesRepository.countByStatus(TestStatus.DRAFT);
+        long totalAttempts = attemptRepository.count();
+        return new AdminStatsDto(totalTests, publishedTests, draftTests, totalAttempts);
+    }
+
+    public TestResponseDto publishTest(Long id) {
+        TestSeries test = testSeriesRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Test not found with id: " + id));
+        test.setStatus(TestStatus.PUBLISHED);
+        TestSeries updated = testSeriesRepository.save(test);
+        return TestResponseDto.fromEntity(updated);
     }
 
     public TestResponseDto createTest(TestRequestDto request) {

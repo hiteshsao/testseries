@@ -10,4 +10,5 @@ import java.util.List;
 @Repository
 public interface TestSeriesRepository extends JpaRepository<TestSeries, Long> {
     List<TestSeries> findByStatus(TestStatus status);
+    long countByStatus(TestStatus status);
 }

@@ -48,4 +48,9 @@ public class AdminTestSeriesController {
         adminTestSeriesService.deleteTest(id);
         return ResponseEntity.noContent().build();
     }
+
+    @PatchMapping("/{id}/publish")
+    public ResponseEntity<TestResponseDto> publishTest(@PathVariable Long id) {
+        return ResponseEntity.ok(adminTestSeriesService.publishTest(id));
+    }
 }
