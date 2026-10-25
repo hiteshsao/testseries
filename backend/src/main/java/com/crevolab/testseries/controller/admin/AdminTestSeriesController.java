@@ -1,5 +1,6 @@
 package com.crevolab.testseries.controller.admin;
 
+import com.crevolab.testseries.dto.admin.ParseResultDto;
 import com.crevolab.testseries.dto.admin.PdfRawTextResponseDto;
 import com.crevolab.testseries.dto.admin.TestRequestDto;
 import com.crevolab.testseries.dto.admin.TestResponseDto;
@@ -12,6 +13,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/admin/tests")
@@ -62,6 +64,14 @@ public class AdminTestSeriesController {
             @PathVariable Long id,
             @RequestParam(value = "file", required = false) MultipartFile file) {
         return ResponseEntity.ok(adminTestSeriesService.uploadPdf(id, file));
+    }
+
+    @PostMapping("/{id}/parse")
+    public ResponseEntity<ParseResultDto> parseQuestions(
+            @PathVariable Long id,
+            @RequestBody(required = false) Map<String, String> body) {
+        String rawText = body != null ? body.get("rawText") : null;
+        return ResponseEntity.ok(adminTestSeriesService.parseAndSaveQuestions(id, rawText));
     }
 
     // DEMO-ONLY: Temporary admin debug endpoint returning raw extracted text for a test's uploaded PDF

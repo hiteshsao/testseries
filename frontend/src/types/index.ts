@@ -46,3 +46,8 @@ export interface ApiErrorResponse {
   message: string;
   errors?: ApiFieldError[];
 }
+
+export interface ParseResult {
+  questionsCreated: number;
+  warnings: string[];
+}

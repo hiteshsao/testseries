@@ -1,4 +1,4 @@
-import { AdminStats, TestSeries, TestRequest, ApiErrorResponse } from '../types';
+import { AdminStats, TestSeries, TestRequest, ApiErrorResponse, ParseResult } from '../types';
 
 export class ApiError extends Error {
   response: ApiErrorResponse;
@@ -93,5 +93,17 @@ export const adminApi = {
   async getRawText(id: number): Promise<{ testId: number; sourcePdfPath: string; rawText: string; pageCount?: number; characterCount?: number }> {
     const res = await fetch(`/api/admin/tests/${id}/raw-text`);
     return handleResponse<{ testId: number; sourcePdfPath: string; rawText: string; pageCount?: number; characterCount?: number }>(res);
+  },
+
+  async parseQuestions(id: number, rawText?: string): Promise<ParseResult> {
+    const options: RequestInit = {
+      method: 'POST',
+    };
+    if (rawText !== undefined) {
+      options.headers = { 'Content-Type': 'application/json' };
+      options.body = JSON.stringify({ rawText });
+    }
+    const res = await fetch(`/api/admin/tests/${id}/parse`, options);
+    return handleResponse<ParseResult>(res);
   },
 };

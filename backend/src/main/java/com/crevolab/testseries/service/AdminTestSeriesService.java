@@ -1,14 +1,17 @@
 package com.crevolab.testseries.service;
 
+import com.crevolab.testseries.domain.Question;
 import com.crevolab.testseries.domain.TestSeries;
 import com.crevolab.testseries.domain.enums.AccessType;
 import com.crevolab.testseries.dto.admin.AdminStatsDto;
+import com.crevolab.testseries.dto.admin.ParseResultDto;
 import com.crevolab.testseries.dto.admin.PdfRawTextResponseDto;
 import com.crevolab.testseries.dto.admin.TestRequestDto;
 import com.crevolab.testseries.dto.admin.TestResponseDto;
 import com.crevolab.testseries.domain.enums.TestStatus;
 import com.crevolab.testseries.exception.ResourceNotFoundException;
 import com.crevolab.testseries.repository.AttemptRepository;
+import com.crevolab.testseries.repository.QuestionRepository;
 import com.crevolab.testseries.repository.TestSeriesRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -21,6 +24,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
@@ -32,13 +36,19 @@ public class AdminTestSeriesService {
     private final TestSeriesRepository testSeriesRepository;
     private final AttemptRepository attemptRepository;
     private final PdfTextExtractionService pdfTextExtractionService;
+    private final QuestionRepository questionRepository;
+    private final QuestionParserService questionParserService;
 
     public AdminTestSeriesService(TestSeriesRepository testSeriesRepository,
                                   AttemptRepository attemptRepository,
-                                  PdfTextExtractionService pdfTextExtractionService) {
+                                  PdfTextExtractionService pdfTextExtractionService,
+                                  QuestionRepository questionRepository,
+                                  QuestionParserService questionParserService) {
         this.testSeriesRepository = testSeriesRepository;
         this.attemptRepository = attemptRepository;
         this.pdfTextExtractionService = pdfTextExtractionService;
+        this.questionRepository = questionRepository;
+        this.questionParserService = questionParserService;
     }
 
     @Transactional(readOnly = true)
@@ -210,6 +220,62 @@ public class AdminTestSeriesService {
         } catch (IOException e) {
             throw new RuntimeException("Failed to read file: " + e.getMessage(), e);
         }
+    }
+
+    public ParseResultDto parseAndSaveQuestions(Long testId) {
+        return parseAndSaveQuestions(testId, null);
+    }
+
+    public ParseResultDto parseAndSaveQuestions(Long testId, String rawTextOverride) {
+        TestSeries test = testSeriesRepository.findById(testId)
+                .orElseThrow(() -> new ResourceNotFoundException("Test not found with id: " + testId));
+
+        String rawText;
+        if (rawTextOverride != null && !rawTextOverride.isBlank()) {
+            rawText = rawTextOverride;
+        } else {
+            String pdfPath = test.getSourcePdfPath();
+            if (pdfPath == null || pdfPath.isBlank()) {
+                throw new IllegalArgumentException("No PDF uploaded for test id: " + testId + ". Upload a PDF or provide rawText.");
+            }
+            Path path = Paths.get(pdfPath);
+            if (!Files.exists(path)) {
+                throw new ResourceNotFoundException("Uploaded PDF file not found at: " + pdfPath);
+            }
+            rawText = pdfTextExtractionService.extractText(path);
+        }
+
+        QuestionParserService.ParseResult parseResult = questionParserService.parse(rawText);
+
+        // Remove existing questions for this test to allow idempotent re-parsing
+        questionRepository.deleteByTestId(test.getId());
+        questionRepository.flush();
+
+        List<Question> questionsToSave = new ArrayList<>();
+        for (QuestionParserService.ParsedQuestion pq : parseResult.getQuestions()) {
+            Question q = new Question();
+            q.setTest(test);
+            q.setOrderNo(pq.orderNo());
+            q.setText(pq.text() != null ? pq.text() : "");
+            q.setOptionA(pq.optionA() != null ? pq.optionA() : "");
+            q.setOptionB(pq.optionB() != null ? pq.optionB() : "");
+            q.setOptionC(pq.optionC() != null ? pq.optionC() : "");
+            q.setOptionD(pq.optionD() != null ? pq.optionD() : "");
+            q.setCorrectOption(null); // Per requirement: saved with correct_option = NULL
+            q.setMarks(BigDecimal.valueOf(4.00)); // Default marks 4
+            q.setNegativeMarks(BigDecimal.valueOf(1.00)); // Default negative marks 1
+            questionsToSave.add(q);
+        }
+
+        if (!questionsToSave.isEmpty()) {
+            questionRepository.saveAll(questionsToSave);
+        }
+
+        // Test status stays DRAFT per requirement
+        test.setStatus(TestStatus.DRAFT);
+        testSeriesRepository.save(test);
+
+        return new ParseResultDto(questionsToSave.size(), parseResult.getWarnings());
     }
 
     private void mapDtoToEntity(TestRequestDto dto, TestSeries entity) {

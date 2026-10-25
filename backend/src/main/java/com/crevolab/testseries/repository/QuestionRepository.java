@@ -9,4 +9,8 @@ import java.util.List;
 @Repository
 public interface QuestionRepository extends JpaRepository<Question, Long> {
     List<Question> findByTestIdOrderByOrderNoAsc(Long testId);
+
+    @org.springframework.data.jpa.repository.Modifying
+    @org.springframework.data.jpa.repository.Query("DELETE FROM Question q WHERE q.test.id = :testId")
+    void deleteByTestId(@org.springframework.data.repository.query.Param("testId") Long testId);
 }

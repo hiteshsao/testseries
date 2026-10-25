@@ -42,6 +42,12 @@ class AdminPdfUploadServiceTest {
     @Mock
     private com.crevolab.testseries.service.PdfTextExtractionService pdfTextExtractionService;
 
+    @Mock
+    private com.crevolab.testseries.repository.QuestionRepository questionRepository;
+
+    @Mock
+    private com.crevolab.testseries.service.QuestionParserService questionParserService;
+
     @InjectMocks
     private AdminTestSeriesService adminTestSeriesService;
 
