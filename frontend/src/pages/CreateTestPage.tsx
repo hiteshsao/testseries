@@ -6,9 +6,6 @@ import {
   PlusCircle,
   AlertCircle,
   CheckCircle2,
-  Clock,
-  Layers,
-  IndianRupee,
   ShieldAlert,
   ArrowLeft,
   ListOrdered

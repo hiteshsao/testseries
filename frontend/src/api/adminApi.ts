@@ -78,4 +78,14 @@ export const adminApi = {
     });
     return handleResponse<void>(res);
   },
+
+  async uploadPdf(id: number, file: File): Promise<TestSeries> {
+    const formData = new FormData();
+    formData.append('file', file);
+    const res = await fetch(`/api/admin/tests/${id}/upload-pdf`, {
+      method: 'POST',
+      body: formData,
+    });
+    return handleResponse<TestSeries>(res);
+  },
 };

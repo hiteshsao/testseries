@@ -5,8 +5,10 @@ import com.crevolab.testseries.dto.admin.TestResponseDto;
 import com.crevolab.testseries.service.AdminTestSeriesService;
 import jakarta.validation.Valid;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -52,5 +54,12 @@ public class AdminTestSeriesController {
     @PatchMapping("/{id}/publish")
     public ResponseEntity<TestResponseDto> publishTest(@PathVariable Long id) {
         return ResponseEntity.ok(adminTestSeriesService.publishTest(id));
+    }
+
+    @PostMapping(value = "/{id}/upload-pdf", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<TestResponseDto> uploadPdf(
+            @PathVariable Long id,
+            @RequestParam(value = "file", required = false) MultipartFile file) {
+        return ResponseEntity.ok(adminTestSeriesService.uploadPdf(id, file));
     }
 }
