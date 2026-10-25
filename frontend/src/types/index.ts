@@ -79,3 +79,66 @@ export interface QuestionRequest {
   marks: number;
   negativeMarks: number;
 }
+
+export interface StudentTestSummary {
+  id: number;
+  title: string;
+  instructions?: string;
+  durationMinutes: number;
+  status: 'PUBLISHED';
+  accessType: 'FREE' | 'PAID';
+  price: number;
+  maxAttempts: number;
+  attemptsUsed: number;
+  purchased: boolean;
+  canAttempt: boolean;
+  totalQuestions?: number;
+  totalMarks?: number;
+  createdAt: string;
+}
+
+export interface StudentQuestion {
+  id: number;
+  orderNo: number;
+  text: string;
+  optionA: string;
+  optionB: string;
+  optionC: string;
+  optionD: string;
+  marks: number;
+  negativeMarks: number;
+}
+
+export interface StudentAnswer {
+  questionId: number;
+  selectedOption?: string | null;
+  markedForReview: boolean;
+}
+
+export interface StudentAnswerRequest {
+  questionId: number;
+  selectedOption?: string | null;
+  markedForReview?: boolean;
+}
+
+export interface StudentAnswerResponse {
+  questionId: number;
+  selectedOption?: string | null;
+  markedForReview: boolean;
+  remainingSeconds: number;
+}
+
+export interface StudentAttemptResponse {
+  attemptId: number;
+  testId: number;
+  testTitle: string;
+  studentId: string;
+  startedAt: string;
+  endsAt: string;
+  remainingSeconds: number;
+  durationMinutes: number;
+  status: 'IN_PROGRESS' | 'SUBMITTED';
+  totalMarks: number;
+  questions: StudentQuestion[];
+  answers: StudentAnswer[];
+}
