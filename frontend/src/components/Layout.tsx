@@ -63,6 +63,7 @@ export const Layout: React.FC = () => {
               <NavLink
                 key={item.path}
                 to={item.path}
+                end={item.path === '/'}
                 className={({ isActive }) => `nav-link ${isActive ? 'active' : ''}`}
               >
                 <Icon className="nav-icon" />
@@ -84,6 +85,7 @@ export const Layout: React.FC = () => {
             >
               <Menu size={22} />
             </button>
+            <div className="mobile-brand-title">Crevolab</div>
           </div>
 
           <div className="topbar-right">
