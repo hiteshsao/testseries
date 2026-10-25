@@ -1,0 +1,22 @@
+# Java / Maven
+backend/target/
+*.class
+*.log
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# App data (uploaded PDFs)
+backend/uploads/
+uploads/
+
+# Secrets / env
+.env
+*.env
+application-local.yml
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
