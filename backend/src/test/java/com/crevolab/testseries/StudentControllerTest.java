@@ -10,6 +10,9 @@ import com.crevolab.testseries.dto.student.StudentAnswerResponseDto;
 import com.crevolab.testseries.dto.student.StudentAttemptResponseDto;
 import com.crevolab.testseries.dto.student.StudentQuestionDto;
 import com.crevolab.testseries.dto.student.StudentTestSummaryDto;
+import com.crevolab.testseries.exception.ConflictException;
+import com.crevolab.testseries.exception.ForbiddenOperationException;
+import com.crevolab.testseries.exception.ResourceNotFoundException;
 import com.crevolab.testseries.service.StudentTestService;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.DisplayName;
@@ -117,19 +120,107 @@ class StudentControllerTest {
     }
 
     @Test
-    @DisplayName("POST /api/student/tests/{id}/start fails with 400 when paid test is not purchased")
+    @DisplayName("GET /api/student/tests/{id}/active-attempt returns 200 with active attempt and no correctOption")
+    void testGetActiveAttemptReturns200WhenActive() throws Exception {
+        Long testId = 101L;
+        String studentId = "student-demo-99";
+
+        StudentQuestionDto q1 = new StudentQuestionDto(
+                1L, 1, "What is Newton's First Law?", "Inertia", "F=ma", "Action Reaction", "Gravity",
+                BigDecimal.valueOf(4.0), BigDecimal.valueOf(1.0)
+        );
+        StudentAnswerDto ans1 = new StudentAnswerDto(1L, "A", false);
+
+        Instant now = Instant.now();
+        Instant endsAt = now.plusSeconds(2400);
+
+        StudentAttemptResponseDto attemptDto = new StudentAttemptResponseDto(
+                555L, testId, "Physics Mock", studentId, now.minusSeconds(1200), endsAt, 2400L, 60,
+                AttemptStatus.IN_PROGRESS, BigDecimal.valueOf(4.0), List.of(q1), List.of(ans1)
+        );
+
+        given(studentTestService.getActiveAttempt(eq(testId), eq(studentId))).willReturn(attemptDto);
+
+        MvcResult result = mockMvc.perform(get("/api/student/tests/{id}/active-attempt", testId)
+                        .header("X-Demo-Student-Id", studentId))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.attemptId").value(555))
+                .andExpect(jsonPath("$.status").value("IN_PROGRESS"))
+                .andExpect(jsonPath("$.remainingSeconds").value(2400))
+                .andExpect(jsonPath("$.answers", hasSize(1)))
+                .andExpect(jsonPath("$.answers[0].selectedOption").value("A"))
+                .andExpect(jsonPath("$.questions", hasSize(1)))
+                .andExpect(jsonPath("$..correct_option").doesNotExist())
+                .andExpect(jsonPath("$..correctOption").doesNotExist())
+                .andReturn();
+
+        String jsonContent = result.getResponse().getContentAsString();
+        assertThat(jsonContent.toLowerCase()).doesNotContain("correct_option");
+        assertThat(jsonContent.toLowerCase()).doesNotContain("correctoption");
+    }
+
+    @Test
+    @DisplayName("GET /api/student/tests/{id}/active-attempt returns 404 when no active attempt exists")
+    void testGetActiveAttemptReturns404WhenNotFound() throws Exception {
+        Long testId = 101L;
+        String studentId = "student-demo-99";
+
+        given(studentTestService.getActiveAttempt(eq(testId), eq(studentId)))
+                .willThrow(new ResourceNotFoundException("No active attempt found for test id: " + testId));
+
+        mockMvc.perform(get("/api/student/tests/{id}/active-attempt", testId)
+                        .header("X-Demo-Student-Id", studentId))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.status").value(404))
+                .andExpect(jsonPath("$.message", containsString("No active attempt found")));
+    }
+
+    @Test
+    @DisplayName("POST /api/student/tests/{id}/start fails with 403 when paid test is not purchased")
     void testStartTestFailsWhenUnpurchasedPaid() throws Exception {
         Long testId = 202L;
         String studentId = "student-free-user";
 
         given(studentTestService.startTest(eq(testId), eq(studentId)))
-                .willThrow(new IllegalArgumentException("This is a paid test (₹499.00) and must be purchased before attempting."));
+                .willThrow(new ForbiddenOperationException("This is a paid test (₹499.00) and must be purchased before attempting."));
 
         mockMvc.perform(post("/api/student/tests/{id}/start", testId)
                         .header("X-Demo-Student-Id", studentId))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
                 .andExpect(jsonPath("$.message", containsString("paid test")));
+    }
+
+    @Test
+    @DisplayName("POST /api/student/tests/{id}/start fails with 409 when test is not published")
+    void testStartTestFailsWhenNotPublished() throws Exception {
+        Long testId = 202L;
+        String studentId = "student-demo-1";
+
+        given(studentTestService.startTest(eq(testId), eq(studentId)))
+                .willThrow(new ConflictException("Test is not published and cannot be started."));
+
+        mockMvc.perform(post("/api/student/tests/{id}/start", testId)
+                        .header("X-Demo-Student-Id", studentId))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.message", containsString("not published")));
+    }
+
+    @Test
+    @DisplayName("POST /api/student/tests/{id}/start fails with 403 when max attempts exceeded")
+    void testStartTestFailsWhenMaxAttemptsExceeded() throws Exception {
+        Long testId = 202L;
+        String studentId = "student-demo-1";
+
+        given(studentTestService.startTest(eq(testId), eq(studentId)))
+                .willThrow(new ForbiddenOperationException("Maximum attempts (2) exceeded for this test."));
+
+        mockMvc.perform(post("/api/student/tests/{id}/start", testId)
+                        .header("X-Demo-Student-Id", studentId))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.message", containsString("Maximum attempts")));
     }
 
     @Test
@@ -154,33 +245,71 @@ class StudentControllerTest {
     }
 
     @Test
-    @DisplayName("PUT /api/student/attempts/{id}/answer fails with 400 when ends_at has passed")
+    @DisplayName("PUT /api/student/attempts/{id}/answer fails with 409 when ends_at has passed")
     void testSaveAnswerFailsWhenExpired() throws Exception {
         Long attemptId = 555L;
         String studentId = "student-demo-99";
         StudentAnswerRequestDto req = new StudentAnswerRequestDto(1L, "A", false);
 
         given(studentTestService.saveAnswer(eq(attemptId), eq(studentId), any()))
-                .willThrow(new IllegalArgumentException("Attempt time limit has expired."));
+                .willThrow(new ConflictException("Attempt time limit has expired."));
 
         mockMvc.perform(put("/api/student/attempts/{id}/answer", attemptId)
                         .header("X-Demo-Student-Id", studentId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(objectMapper.writeValueAsString(req)))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
                 .andExpect(jsonPath("$.message", containsString("expired")));
     }
 
     @Test
-    @DisplayName("PUT /api/student/attempts/{id}/answer fails with 400 when attempt was submitted")
+    @DisplayName("PUT /api/student/attempts/{id}/answer fails with 409 when attempt was submitted")
     void testSaveAnswerFailsWhenSubmitted() throws Exception {
         Long attemptId = 555L;
         String studentId = "student-demo-99";
         StudentAnswerRequestDto req = new StudentAnswerRequestDto(1L, "A", false);
 
         given(studentTestService.saveAnswer(eq(attemptId), eq(studentId), any()))
-                .willThrow(new IllegalArgumentException("Attempt has already been submitted and cannot be modified."));
+                .willThrow(new ConflictException("Attempt has already been submitted and cannot be modified."));
+
+        mockMvc.perform(put("/api/student/attempts/{id}/answer", attemptId)
+                        .header("X-Demo-Student-Id", studentId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.message", containsString("already been submitted")));
+    }
+
+    @Test
+    @DisplayName("PUT /api/student/attempts/{id}/answer fails with 403 when attempt belongs to another student")
+    void testSaveAnswerFailsWhenBelongsToAnotherStudent() throws Exception {
+        Long attemptId = 555L;
+        String studentId = "student-demo-99";
+        StudentAnswerRequestDto req = new StudentAnswerRequestDto(1L, "A", false);
+
+        given(studentTestService.saveAnswer(eq(attemptId), eq(studentId), any()))
+                .willThrow(new ForbiddenOperationException("Attempt does not belong to student: " + studentId));
+
+        mockMvc.perform(put("/api/student/attempts/{id}/answer", attemptId)
+                        .header("X-Demo-Student-Id", studentId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(objectMapper.writeValueAsString(req)))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.message", containsString("does not belong to student")));
+    }
+
+    @Test
+    @DisplayName("PUT /api/student/attempts/{id}/answer fails with 400 for malformed input (invalid option letter)")
+    void testSaveAnswerFailsWhenInvalidOptionLetter() throws Exception {
+        Long attemptId = 555L;
+        String studentId = "student-demo-99";
+        StudentAnswerRequestDto req = new StudentAnswerRequestDto(1L, "Z", false);
+
+        given(studentTestService.saveAnswer(eq(attemptId), eq(studentId), any()))
+                .willThrow(new IllegalArgumentException("Selected option must be one of A, B, C, D or null."));
 
         mockMvc.perform(put("/api/student/attempts/{id}/answer", attemptId)
                         .header("X-Demo-Student-Id", studentId)
@@ -188,7 +317,7 @@ class StudentControllerTest {
                         .content(objectMapper.writeValueAsString(req)))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.status").value(400))
-                .andExpect(jsonPath("$.message", containsString("already been submitted")));
+                .andExpect(jsonPath("$.message", containsString("Selected option must be one of A, B, C, D")));
     }
 
     @Test
@@ -231,5 +360,53 @@ class StudentControllerTest {
         String jsonContent = result.getResponse().getContentAsString();
         assertThat(jsonContent.toLowerCase()).doesNotContain("correct_option");
         assertThat(jsonContent.toLowerCase()).doesNotContain("correctoption");
+    }
+
+    @Test
+    @DisplayName("GET /api/student/attempts/{id} fails with 403 when attempt belongs to another student")
+    void testGetAttemptFailsWhenBelongsToAnotherStudent() throws Exception {
+        Long attemptId = 555L;
+        String studentId = "student-demo-99";
+
+        given(studentTestService.getAttempt(eq(attemptId), eq(studentId)))
+                .willThrow(new ForbiddenOperationException("Attempt does not belong to student: " + studentId));
+
+        mockMvc.perform(get("/api/student/attempts/{id}", attemptId)
+                        .header("X-Demo-Student-Id", studentId))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.message", containsString("does not belong to student")));
+    }
+
+    @Test
+    @DisplayName("GET /api/student/tests/{id} fails with 409 when test is not published")
+    void testGetPublishedTestByIdFailsWhenNotPublished() throws Exception {
+        Long testId = 101L;
+        String studentId = "student-demo-99";
+
+        given(studentTestService.getPublishedTestById(eq(testId), eq(studentId)))
+                .willThrow(new ConflictException("Test is not published."));
+
+        mockMvc.perform(get("/api/student/tests/{id}", testId)
+                        .header("X-Demo-Student-Id", studentId))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.status").value(409))
+                .andExpect(jsonPath("$.message", containsString("not published")));
+    }
+
+    @Test
+    @DisplayName("POST /api/student/attempts/{id}/submit fails with 403 when attempt belongs to another student")
+    void testSubmitAttemptFailsWhenBelongsToAnotherStudent() throws Exception {
+        Long attemptId = 555L;
+        String studentId = "student-demo-99";
+
+        given(studentTestService.submitAttempt(eq(attemptId), eq(studentId)))
+                .willThrow(new ForbiddenOperationException("Attempt does not belong to student: " + studentId));
+
+        mockMvc.perform(post("/api/student/attempts/{id}/submit", attemptId)
+                        .header("X-Demo-Student-Id", studentId))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.status").value(403))
+                .andExpect(jsonPath("$.message", containsString("does not belong to student")));
     }
 }

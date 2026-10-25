@@ -84,6 +84,17 @@ export const studentApi = {
   },
 
   /**
+   * GET /api/student/tests/{id}/active-attempt
+   * Returns the active in-progress attempt or throws 404 ApiError if none exists.
+   */
+  async getActiveAttempt(testId: number, studentId?: string): Promise<StudentAttemptResponse> {
+    const res = await fetch(`/api/student/tests/${testId}/active-attempt`, {
+      headers: getHeaders(studentId),
+    });
+    return handleResponse<StudentAttemptResponse>(res);
+  },
+
+  /**
    * PUT /api/student/attempts/{id}/answer
    * Saves selected option and marked_for_review; rejects after ends_at or if submitted.
    */

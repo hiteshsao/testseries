@@ -15,6 +15,8 @@ import com.crevolab.testseries.dto.student.StudentAttemptResponseDto;
 import com.crevolab.testseries.dto.student.StudentQuestionDto;
 import com.crevolab.testseries.dto.student.StudentSubmitResultDto;
 import com.crevolab.testseries.dto.student.StudentTestSummaryDto;
+import com.crevolab.testseries.exception.ConflictException;
+import com.crevolab.testseries.exception.ForbiddenOperationException;
 import com.crevolab.testseries.exception.ResourceNotFoundException;
 import com.crevolab.testseries.repository.AttemptAnswerRepository;
 import com.crevolab.testseries.repository.AttemptRepository;
@@ -28,6 +30,7 @@ import java.math.BigDecimal;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -107,14 +110,14 @@ public class StudentTestService {
                 .orElseThrow(() -> new ResourceNotFoundException("Test not found with id: " + testId));
 
         if (test.getStatus() != TestStatus.PUBLISHED) {
-            throw new IllegalArgumentException("Test is not published and cannot be started.");
+            throw new ConflictException("Test is not published and cannot be started.");
         }
 
         // Paid-purchase check
         if (test.getAccessType() == AccessType.PAID) {
             boolean purchased = purchaseRepository.existsByTestIdAndStudentId(test.getId(), studentId);
             if (!purchased) {
-                throw new IllegalArgumentException("This is a paid test (₹" + test.getPrice() + ") and must be purchased before attempting.");
+                throw new ForbiddenOperationException("This is a paid test (₹" + test.getPrice() + ") and must be purchased before attempting.");
             }
         }
 
@@ -123,7 +126,7 @@ public class StudentTestService {
         Instant now = Instant.now();
         Optional<Attempt> activeAttempt = existingAttempts.stream()
                 .filter(a -> a.getStatus() == AttemptStatus.IN_PROGRESS && now.isBefore(a.getEndsAt()))
-                .findFirst();
+                .max(Comparator.comparing(Attempt::getStartedAt));
         if (activeAttempt.isPresent()) {
             return getAttempt(activeAttempt.get().getId(), studentId);
         }
@@ -131,7 +134,7 @@ public class StudentTestService {
         // Max attempts check
         long attemptsCount = attemptRepository.countByTestIdAndStudentId(test.getId(), studentId);
         if (test.getMaxAttempts() != null && attemptsCount >= test.getMaxAttempts()) {
-            throw new IllegalArgumentException("Maximum attempts (" + test.getMaxAttempts() + ") exceeded for this test.");
+            throw new ForbiddenOperationException("Maximum attempts (" + test.getMaxAttempts() + ") exceeded for this test.");
         }
 
         List<Question> questions = questionRepository.findByTestIdOrderByOrderNoAsc(test.getId());
@@ -205,18 +208,18 @@ public class StudentTestService {
                 .orElseThrow(() -> new ResourceNotFoundException("Attempt not found with id: " + attemptId));
 
         if (!attempt.getStudentId().equals(studentId)) {
-            throw new IllegalArgumentException("Attempt does not belong to student: " + studentId);
+            throw new ForbiddenOperationException("Attempt does not belong to student: " + studentId);
         }
 
         // Rejection rule 1: If submitted
         if (attempt.getStatus() == AttemptStatus.SUBMITTED || attempt.getSubmittedAt() != null) {
-            throw new IllegalArgumentException("Attempt has already been submitted and cannot be modified.");
+            throw new ConflictException("Attempt has already been submitted and cannot be modified.");
         }
 
         // Rejection rule 2: After ends_at (server clock)
         Instant now = Instant.now();
         if (now.isAfter(attempt.getEndsAt())) {
-            throw new IllegalArgumentException("Attempt time limit has expired. Submission window closed at: " + attempt.getEndsAt());
+            throw new ConflictException("Attempt time limit has expired. Submission window closed at: " + attempt.getEndsAt());
         }
 
         Question question = questionRepository.findById(request.getQuestionId())
@@ -264,7 +267,7 @@ public class StudentTestService {
                 .orElseThrow(() -> new ResourceNotFoundException("Attempt not found with id: " + attemptId));
 
         if (!attempt.getStudentId().equals(studentId)) {
-            throw new IllegalArgumentException("Attempt does not belong to student: " + studentId);
+            throw new ForbiddenOperationException("Attempt does not belong to student: " + studentId);
         }
 
         Instant now = Instant.now();
@@ -311,6 +314,26 @@ public class StudentTestService {
     }
 
     /**
+     * GET /api/student/tests/{id}/active-attempt
+     * Returns the active in-progress attempt (questions without correct_option, saved answers, remaining seconds)
+     * or throws 404 (ResourceNotFoundException) if none exists.
+     */
+    @Transactional(readOnly = true)
+    public StudentAttemptResponseDto getActiveAttempt(Long testId, String studentId) {
+        TestSeries test = testSeriesRepository.findById(testId)
+                .orElseThrow(() -> new ResourceNotFoundException("Test not found with id: " + testId));
+
+        List<Attempt> existingAttempts = attemptRepository.findByTestIdAndStudentId(test.getId(), studentId);
+        Instant now = Instant.now();
+        Attempt activeAttempt = existingAttempts.stream()
+                .filter(a -> a.getStatus() == AttemptStatus.IN_PROGRESS && now.isBefore(a.getEndsAt()))
+                .max(Comparator.comparing(Attempt::getStartedAt))
+                .orElseThrow(() -> new ResourceNotFoundException("No active attempt found for test id: " + testId));
+
+        return getAttempt(activeAttempt.getId(), studentId);
+    }
+
+    /**
      * GET /api/student/tests/{id} (PUBLISHED only)
      */
     @Transactional(readOnly = true)
@@ -319,7 +342,7 @@ public class StudentTestService {
                 .orElseThrow(() -> new ResourceNotFoundException("Test not found with id: " + testId));
 
         if (test.getStatus() != TestStatus.PUBLISHED) {
-            throw new IllegalArgumentException("Test is not published.");
+            throw new ConflictException("Test is not published.");
         }
 
         long attemptsUsed = attemptRepository.countByTestIdAndStudentId(test.getId(), studentId);
@@ -364,7 +387,7 @@ public class StudentTestService {
                 .orElseThrow(() -> new ResourceNotFoundException("Attempt not found with id: " + attemptId));
 
         if (!attempt.getStudentId().equals(studentId)) {
-            throw new IllegalArgumentException("Attempt does not belong to student: " + studentId);
+            throw new ForbiddenOperationException("Attempt does not belong to student: " + studentId);
         }
 
         // Prevent double submit: If already submitted, return saved result idempotently

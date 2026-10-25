@@ -60,6 +60,19 @@ public class StudentController {
     }
 
     /**
+     * GET /api/student/tests/{id}/active-attempt
+     * Returns the active in-progress attempt id/summary or 404 if no active attempt exists.
+     */
+    @GetMapping("/tests/{id}/active-attempt")
+    public ResponseEntity<StudentAttemptResponseDto> getActiveAttempt(
+            @PathVariable Long id,
+            // DEMO-ONLY: Student ID extracted from X-Demo-Student-Id demo header
+            @RequestHeader(value = DEMO_STUDENT_HEADER, required = false) String studentHeader) {
+        String studentId = resolveStudentId(studentHeader);
+        return ResponseEntity.ok(studentTestService.getActiveAttempt(id, studentId));
+    }
+
+    /**
      * PUT /api/student/attempts/{id}/answer
      * Saves selected option and marked_for_review; rejects after ends_at or if submitted.
      */
