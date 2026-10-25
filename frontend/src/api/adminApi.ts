@@ -1,4 +1,4 @@
-import { AdminStats, TestSeries, TestRequest, ApiErrorResponse, ParseResult } from '../types';
+import { AdminStats, TestSeries, TestRequest, ApiErrorResponse, ParseResult, Question, QuestionRequest } from '../types';
 
 export class ApiError extends Error {
   response: ApiErrorResponse;
@@ -105,5 +105,35 @@ export const adminApi = {
     }
     const res = await fetch(`/api/admin/tests/${id}/parse`, options);
     return handleResponse<ParseResult>(res);
+  },
+
+  async getQuestions(testId: number): Promise<Question[]> {
+    const res = await fetch(`/api/admin/tests/${testId}/questions`);
+    return handleResponse<Question[]>(res);
+  },
+
+  async createQuestion(testId: number, data: QuestionRequest): Promise<Question> {
+    const res = await fetch(`/api/admin/tests/${testId}/questions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return handleResponse<Question>(res);
+  },
+
+  async updateQuestion(id: number, data: QuestionRequest): Promise<Question> {
+    const res = await fetch(`/api/admin/questions/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+    return handleResponse<Question>(res);
+  },
+
+  async deleteQuestion(id: number): Promise<void> {
+    const res = await fetch(`/api/admin/questions/${id}`, {
+      method: 'DELETE',
+    });
+    return handleResponse<void>(res);
   },
 };

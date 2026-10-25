@@ -53,3 +53,28 @@ export interface ParseResult {
   questionsCreated: number;
   warnings: string[];
 }
+
+export interface Question {
+  id: number;
+  testId: number;
+  orderNo: number;
+  text: string;
+  optionA: string;
+  optionB: string;
+  optionC: string;
+  optionD: string;
+  correctOption?: 'A' | 'B' | 'C' | 'D' | null;
+  marks: number;
+  negativeMarks: number;
+}
+
+export interface QuestionRequest {
+  text: string;
+  optionA: string;
+  optionB: string;
+  optionC: string;
+  optionD: string;
+  correctOption?: 'A' | 'B' | 'C' | 'D' | '' | null;
+  marks: number;
+  negativeMarks: number;
+}

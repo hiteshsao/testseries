@@ -13,4 +13,7 @@ public interface QuestionRepository extends JpaRepository<Question, Long> {
     @org.springframework.data.jpa.repository.Modifying
     @org.springframework.data.jpa.repository.Query("DELETE FROM Question q WHERE q.test.id = :testId")
     void deleteByTestId(@org.springframework.data.repository.query.Param("testId") Long testId);
+
+    @org.springframework.data.jpa.repository.Query("SELECT COALESCE(MAX(q.orderNo), 0) FROM Question q WHERE q.test.id = :testId")
+    Integer findMaxOrderNoByTestId(@org.springframework.data.repository.query.Param("testId") Long testId);
 }
