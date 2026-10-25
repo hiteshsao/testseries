@@ -3,6 +3,7 @@ package com.crevolab.testseries.controller.student;
 import com.crevolab.testseries.dto.student.StudentAnswerRequestDto;
 import com.crevolab.testseries.dto.student.StudentAnswerResponseDto;
 import com.crevolab.testseries.dto.student.StudentAttemptResponseDto;
+import com.crevolab.testseries.dto.student.StudentSubmitResultDto;
 import com.crevolab.testseries.dto.student.StudentTestSummaryDto;
 import com.crevolab.testseries.service.StudentTestService;
 import jakarta.validation.Valid;
@@ -83,5 +84,32 @@ public class StudentController {
             @RequestHeader(value = DEMO_STUDENT_HEADER, required = false) String studentHeader) {
         String studentId = resolveStudentId(studentHeader);
         return ResponseEntity.ok(studentTestService.getAttempt(id, studentId));
+    }
+
+    /**
+     * GET /api/student/tests/{id} (PUBLISHED only)
+     * Fetches details and instructions for a published test.
+     */
+    @GetMapping("/tests/{id}")
+    public ResponseEntity<StudentTestSummaryDto> getPublishedTestById(
+            @PathVariable Long id,
+            // DEMO-ONLY: Student ID extracted from X-Demo-Student-Id demo header
+            @RequestHeader(value = DEMO_STUDENT_HEADER, required = false) String studentHeader) {
+        String studentId = resolveStudentId(studentHeader);
+        return ResponseEntity.ok(studentTestService.getPublishedTestById(id, studentId));
+    }
+
+    /**
+     * POST /api/student/attempts/{id}/submit
+     * Submits the attempt, calculates score, correct/incorrect/unanswered counts.
+     * Prevents double submit idempotently.
+     */
+    @PostMapping("/attempts/{id}/submit")
+    public ResponseEntity<StudentSubmitResultDto> submitAttempt(
+            @PathVariable Long id,
+            // DEMO-ONLY: Student ID extracted from X-Demo-Student-Id demo header
+            @RequestHeader(value = DEMO_STUDENT_HEADER, required = false) String studentHeader) {
+        String studentId = resolveStudentId(studentHeader);
+        return ResponseEntity.ok(studentTestService.submitAttempt(id, studentId));
     }
 }

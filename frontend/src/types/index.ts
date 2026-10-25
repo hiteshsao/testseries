@@ -142,3 +142,20 @@ export interface StudentAttemptResponse {
   questions: StudentQuestion[];
   answers: StudentAnswer[];
 }
+
+export interface StudentSubmitResult {
+  attemptId: number;
+  testId: number;
+  testTitle: string;
+  studentId: string;
+  startedAt: string;
+  submittedAt: string;
+  status: 'SUBMITTED';
+  totalMarks: number;
+  marksObtained: number;
+  totalQuestions: number;
+  correct: number;
+  incorrect: number;
+  unanswered: number;
+  percentage: number;
+}

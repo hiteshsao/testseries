@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { adminApi, ApiError } from '../api/adminApi';
-import { TestSeries } from '../types';
+import { studentApi } from '../api/studentApi';
+import { useRole } from '../context/RoleContext';
+import { TestSeries, StudentTestSummary } from '../types';
 import { PublishProblemsModal } from '../components/PublishProblemsModal';
 import {
   PlusCircle,
@@ -19,11 +21,16 @@ import {
   Clock,
   FileText,
   Eye,
-  X
+  X,
+  Play,
+  Award,
+  ShieldCheck
 } from 'lucide-react';
 
 export const TestsPage: React.FC = () => {
+  const { role } = useRole();
   const [tests, setTests] = useState<TestSeries[]>([]);
+  const [studentTests, setStudentTests] = useState<StudentTestSummary[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -93,8 +100,13 @@ export const TestsPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const data = await adminApi.getTests();
-      setTests(data);
+      if (role === 'Student') {
+        const studentData = await studentApi.getPublishedTests();
+        setStudentTests(studentData);
+      } else {
+        const data = await adminApi.getTests();
+        setTests(data);
+      }
     } catch (err: any) {
       setError(err?.response?.message || err?.message || 'Failed to load test series.');
     } finally {
@@ -104,7 +116,7 @@ export const TestsPage: React.FC = () => {
 
   useEffect(() => {
     fetchTests();
-  }, []);
+  }, [role]);
 
   const handlePublish = async (test: TestSeries) => {
     setPublishingId(test.id);
@@ -171,6 +183,142 @@ export const TestsPage: React.FC = () => {
     return matchesSearch && matchesStatus;
   });
 
+  // STUDENT VIEW
+  if (role === 'Student') {
+    const filteredStudentTests = studentTests.filter((t) => {
+      return !searchQuery || t.title.toLowerCase().includes(searchQuery.toLowerCase());
+    });
+
+    return (
+      <div>
+        <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>
+          <div>
+            <h1 className="page-title">Available Online Tests</h1>
+            <p className="page-subtitle">
+              Practice full-length test series with real-time countdown timer, instant autosave, and question palette
+            </p>
+          </div>
+          <button className="btn-secondary" onClick={fetchTests} disabled={loading}>
+            <RefreshCw size={16} className={loading ? 'spin' : ''} />
+            Refresh Tests
+          </button>
+        </div>
+
+        {error && (
+          <div className="alert-box alert-error">
+            <AlertCircle size={20} />
+            <span>{error}</span>
+          </div>
+        )}
+
+        {/* Search Bar */}
+        <div style={{ position: 'relative', maxWidth: '420px', marginBottom: '1.5rem' }}>
+          <Search size={18} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+          <input
+            type="text"
+            className="form-input"
+            style={{ paddingLeft: '2.4rem' }}
+            placeholder="Search available tests..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+
+        {/* Student Test Cards Grid */}
+        {loading ? (
+          <div style={{ textAlign: 'center', padding: '3rem 1rem' }}>
+            <div className="btn-spinner" style={{ width: 32, height: 32, margin: '0 auto 1rem', borderWidth: 3 }} />
+            <p style={{ color: 'var(--text-secondary)' }}>Loading published assessments...</p>
+          </div>
+        ) : filteredStudentTests.length === 0 ? (
+          <div className="card" style={{ textAlign: 'center', padding: '3.5rem 1.5rem' }}>
+            <FileQuestion size={44} color="var(--text-secondary)" style={{ margin: '0 auto 1rem' }} />
+            <h3 style={{ fontSize: '1.2rem', marginBottom: '0.5rem', color: 'var(--text-primary)' }}>
+              No Published Tests Available
+            </h3>
+            <p style={{ color: 'var(--text-secondary)', maxWidth: 440, margin: '0 auto 1.5rem' }}>
+              There are currently no tests published for students. Switch to Admin mode in the top bar to create and publish a test.
+            </p>
+          </div>
+        ) : (
+          <div className="student-tests-grid">
+            {filteredStudentTests.map((t) => (
+              <div key={t.id} className="student-test-card">
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', marginBottom: '0.75rem' }}>
+                    <span className="badge badge-published" style={{ fontSize: '0.72rem', letterSpacing: '0.04em' }}>
+                      CBT Test Series
+                    </span>
+                    {t.accessType === 'FREE' ? (
+                      <span className="badge" style={{ backgroundColor: 'rgba(16, 185, 129, 0.15)', color: '#10b981', border: '1px solid rgba(16, 185, 129, 0.3)' }}>
+                        FREE
+                      </span>
+                    ) : (
+                      <span className="badge" style={{ backgroundColor: 'rgba(245, 158, 11, 0.15)', color: '#f59e0b', border: '1px solid rgba(245, 158, 11, 0.3)' }}>
+                        ₹{t.price}
+                      </span>
+                    )}
+                  </div>
+
+                  <h3 style={{ fontSize: '1.15rem', fontWeight: 700, color: 'var(--text-primary)', marginBottom: '0.5rem' }}>
+                    {t.title}
+                  </h3>
+
+                  {t.instructions && (
+                    <p style={{ color: 'var(--text-secondary)', fontSize: '0.85rem', lineHeight: 1.4, marginBottom: '0.75rem', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>
+                      {t.instructions}
+                    </p>
+                  )}
+
+                  <div className="student-test-meta">
+                    <div className="student-meta-item">
+                      <Clock size={15} color="var(--teal-primary)" />
+                      <span>Duration: <strong>{t.durationMinutes}m</strong></span>
+                    </div>
+                    <div className="student-meta-item">
+                      <FileQuestion size={15} color="var(--teal-primary)" />
+                      <span>Questions: <strong>{t.totalQuestions ?? '—'}</strong></span>
+                    </div>
+                    <div className="student-meta-item">
+                      <Award size={15} color="var(--teal-primary)" />
+                      <span>Marks: <strong>{t.totalMarks != null ? Number(t.totalMarks).toFixed(0) : '—'}</strong></span>
+                    </div>
+                    <div className="student-meta-item">
+                      <ShieldCheck size={15} color="#818cf8" />
+                      <span>Attempts: <strong>{t.attemptsUsed || 0}/{t.maxAttempts || '∞'}</strong></span>
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ marginTop: '1rem' }}>
+                  {t.canAttempt ? (
+                    <Link
+                      to={`/tests/${t.id}/instructions`}
+                      className="btn btn-primary"
+                      style={{ width: '100%', justifyContent: 'center', textDecoration: 'none' }}
+                    >
+                      <Play size={16} />
+                      View Instructions & Start
+                    </Link>
+                  ) : (
+                    <button
+                      disabled
+                      className="btn btn-secondary"
+                      style={{ width: '100%', justifyContent: 'center', opacity: 0.65, cursor: 'not-allowed' }}
+                    >
+                      Max Attempts Limit Reached
+                    </button>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ADMIN VIEW
   return (
     <div>
       <div className="page-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: '1rem' }}>

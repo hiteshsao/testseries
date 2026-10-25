@@ -3,6 +3,7 @@ import {
   StudentAttemptResponse,
   StudentAnswerRequest,
   StudentAnswerResponse,
+  StudentSubmitResult,
   ApiErrorResponse
 } from '../types';
 
@@ -60,6 +61,16 @@ export const studentApi = {
   },
 
   /**
+   * GET /api/student/tests/{id} (PUBLISHED only)
+   */
+  async getPublishedTestById(testId: number, studentId?: string): Promise<StudentTestSummary> {
+    const res = await fetch(`/api/student/tests/${testId}`, {
+      headers: getHeaders(studentId),
+    });
+    return handleResponse<StudentTestSummary>(res);
+  },
+
+  /**
    * POST /api/student/tests/{id}/start
    * Creates attempt, sets ends_at = now + duration (server clock),
    * enforces max_attempts and paid-purchase check; returns questions WITHOUT correct_option, marks only.
@@ -94,5 +105,17 @@ export const studentApi = {
       headers: getHeaders(studentId),
     });
     return handleResponse<StudentAttemptResponse>(res);
+  },
+
+  /**
+   * POST /api/student/attempts/{id}/submit
+   * Submits the attempt, calculates score, and prevents double submission.
+   */
+  async submitAttempt(attemptId: number, studentId?: string): Promise<StudentSubmitResult> {
+    const res = await fetch(`/api/student/attempts/${attemptId}/submit`, {
+      method: 'POST',
+      headers: getHeaders(studentId),
+    });
+    return handleResponse<StudentSubmitResult>(res);
   },
 };

@@ -13,6 +13,7 @@ import com.crevolab.testseries.dto.student.StudentAnswerRequestDto;
 import com.crevolab.testseries.dto.student.StudentAnswerResponseDto;
 import com.crevolab.testseries.dto.student.StudentAttemptResponseDto;
 import com.crevolab.testseries.dto.student.StudentQuestionDto;
+import com.crevolab.testseries.dto.student.StudentSubmitResultDto;
 import com.crevolab.testseries.dto.student.StudentTestSummaryDto;
 import com.crevolab.testseries.exception.ResourceNotFoundException;
 import com.crevolab.testseries.repository.AttemptAnswerRepository;
@@ -28,7 +29,9 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -115,6 +118,16 @@ public class StudentTestService {
             }
         }
 
+        // If an active in-progress attempt already exists and has not expired, resume it
+        List<Attempt> existingAttempts = attemptRepository.findByTestIdAndStudentId(test.getId(), studentId);
+        Instant now = Instant.now();
+        Optional<Attempt> activeAttempt = existingAttempts.stream()
+                .filter(a -> a.getStatus() == AttemptStatus.IN_PROGRESS && now.isBefore(a.getEndsAt()))
+                .findFirst();
+        if (activeAttempt.isPresent()) {
+            return getAttempt(activeAttempt.get().getId(), studentId);
+        }
+
         // Max attempts check
         long attemptsCount = attemptRepository.countByTestIdAndStudentId(test.getId(), studentId);
         if (test.getMaxAttempts() != null && attemptsCount >= test.getMaxAttempts()) {
@@ -129,13 +142,13 @@ public class StudentTestService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         // Server clock time calculation
-        Instant now = Instant.now();
-        Instant endsAt = now.plus(Duration.ofMinutes(test.getDurationMinutes()));
+        Instant startedAt = Instant.now();
+        Instant endsAt = startedAt.plus(Duration.ofMinutes(test.getDurationMinutes()));
 
         Attempt attempt = new Attempt();
         attempt.setTest(test);
         attempt.setStudentId(studentId);
-        attempt.setStartedAt(now);
+        attempt.setStartedAt(startedAt);
         attempt.setEndsAt(endsAt);
         attempt.setStatus(AttemptStatus.IN_PROGRESS);
         attempt.setTotalMarks(totalMarks);
@@ -294,6 +307,139 @@ public class StudentTestService {
                 attempt.getTotalMarks(),
                 questionDtos,
                 answerDtos
+        );
+    }
+
+    /**
+     * GET /api/student/tests/{id} (PUBLISHED only)
+     */
+    @Transactional(readOnly = true)
+    public StudentTestSummaryDto getPublishedTestById(Long testId, String studentId) {
+        TestSeries test = testSeriesRepository.findById(testId)
+                .orElseThrow(() -> new ResourceNotFoundException("Test not found with id: " + testId));
+
+        if (test.getStatus() != TestStatus.PUBLISHED) {
+            throw new IllegalArgumentException("Test is not published.");
+        }
+
+        long attemptsUsed = attemptRepository.countByTestIdAndStudentId(test.getId(), studentId);
+        boolean isFree = test.getAccessType() == AccessType.FREE;
+        boolean purchased = isFree || purchaseRepository.existsByTestIdAndStudentId(test.getId(), studentId);
+        boolean maxAttemptsReached = test.getMaxAttempts() != null && attemptsUsed >= test.getMaxAttempts();
+        boolean canAttempt = purchased && !maxAttemptsReached;
+
+        List<Question> questions = questionRepository.findByTestIdOrderByOrderNoAsc(test.getId());
+        int totalQuestions = questions.size();
+        BigDecimal totalMarks = questions.stream()
+                .map(Question::getMarks)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        return new StudentTestSummaryDto(
+                test.getId(),
+                test.getTitle(),
+                test.getInstructions(),
+                test.getDurationMinutes(),
+                test.getStatus(),
+                test.getAccessType(),
+                test.getPrice(),
+                test.getMaxAttempts(),
+                attemptsUsed,
+                purchased,
+                canAttempt,
+                totalQuestions,
+                totalMarks,
+                test.getCreatedAt()
+        );
+    }
+
+    /**
+     * POST /api/student/attempts/{id}/submit
+     * Submits the attempt, calculates score, correct, incorrect, unanswered,
+     * marks_obtained, and sets status = SUBMITTED.
+     * Prevents double submit idempotently.
+     */
+    public StudentSubmitResultDto submitAttempt(Long attemptId, String studentId) {
+        Attempt attempt = attemptRepository.findById(attemptId)
+                .orElseThrow(() -> new ResourceNotFoundException("Attempt not found with id: " + attemptId));
+
+        if (!attempt.getStudentId().equals(studentId)) {
+            throw new IllegalArgumentException("Attempt does not belong to student: " + studentId);
+        }
+
+        // Prevent double submit: If already submitted, return saved result idempotently
+        if (attempt.getStatus() == AttemptStatus.SUBMITTED) {
+            return toSubmitResult(attempt);
+        }
+
+        List<Question> questions = questionRepository.findByTestIdOrderByOrderNoAsc(attempt.getTest().getId());
+        List<AttemptAnswer> answers = attemptAnswerRepository.findAnswersByAttemptId(attempt.getId());
+        Map<Long, AttemptAnswer> answerMap = answers.stream()
+                .collect(Collectors.toMap(a -> a.getQuestion().getId(), a -> a, (a1, a2) -> a1));
+
+        int correct = 0;
+        int incorrect = 0;
+        int unanswered = 0;
+        BigDecimal marksObtained = BigDecimal.ZERO;
+
+        for (Question q : questions) {
+            AttemptAnswer ans = answerMap.get(q.getId());
+            String selected = ans != null ? ans.getSelectedOption() : null;
+            if (selected == null || selected.trim().isEmpty()) {
+                unanswered++;
+            } else if (q.getCorrectOption() != null && selected.trim().equalsIgnoreCase(q.getCorrectOption().trim())) {
+                correct++;
+                if (q.getMarks() != null) {
+                    marksObtained = marksObtained.add(q.getMarks());
+                }
+            } else {
+                incorrect++;
+                if (q.getNegativeMarks() != null) {
+                    marksObtained = marksObtained.subtract(q.getNegativeMarks());
+                }
+            }
+        }
+
+        Instant submittedAt = Instant.now();
+        attempt.setStatus(AttemptStatus.SUBMITTED);
+        attempt.setSubmittedAt(submittedAt);
+        attempt.setCorrect(correct);
+        attempt.setIncorrect(incorrect);
+        attempt.setUnanswered(unanswered);
+        attempt.setMarksObtained(marksObtained);
+
+        Attempt saved = attemptRepository.save(attempt);
+        return toSubmitResult(saved);
+    }
+
+    private StudentSubmitResultDto toSubmitResult(Attempt attempt) {
+        List<Question> questions = questionRepository.findByTestIdOrderByOrderNoAsc(attempt.getTest().getId());
+        int totalQuestions = questions.size();
+        BigDecimal totalMarks = attempt.getTotalMarks() != null ? attempt.getTotalMarks() : BigDecimal.ZERO;
+        BigDecimal marksObtained = attempt.getMarksObtained() != null ? attempt.getMarksObtained() : BigDecimal.ZERO;
+
+        Double percentage = 0.0;
+        if (totalMarks.compareTo(BigDecimal.ZERO) > 0) {
+            percentage = marksObtained.doubleValue() / totalMarks.doubleValue() * 100.0;
+            // Round to 2 decimal places
+            percentage = Math.round(percentage * 100.0) / 100.0;
+        }
+
+        return new StudentSubmitResultDto(
+                attempt.getId(),
+                attempt.getTest().getId(),
+                attempt.getTest().getTitle(),
+                attempt.getStudentId(),
+                attempt.getStartedAt(),
+                attempt.getSubmittedAt(),
+                attempt.getStatus(),
+                totalMarks,
+                marksObtained,
+                totalQuestions,
+                attempt.getCorrect(),
+                attempt.getIncorrect(),
+                attempt.getUnanswered(),
+                percentage
         );
     }
 }
