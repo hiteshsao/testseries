@@ -12,6 +12,8 @@ public class ApiErrorResponse {
     private Instant timestamp = Instant.now();
     private int status;
     private String message;
+    private String code;
+    private String errorCode;
     private List<FieldErrorDetail> errors;
 
     public ApiErrorResponse() {
@@ -20,6 +22,13 @@ public class ApiErrorResponse {
     public ApiErrorResponse(int status, String message) {
         this.status = status;
         this.message = message;
+    }
+
+    public ApiErrorResponse(int status, String message, String errorCode) {
+        this.status = status;
+        this.message = message;
+        this.errorCode = errorCode;
+        this.code = errorCode;
     }
 
     public ApiErrorResponse(int status, String message, List<FieldErrorDetail> errors) {
@@ -50,6 +59,24 @@ public class ApiErrorResponse {
 
     public void setMessage(String message) {
         this.message = message;
+    }
+
+    public String getCode() {
+        return code;
+    }
+
+    public void setCode(String code) {
+        this.code = code;
+        this.errorCode = code;
+    }
+
+    public String getErrorCode() {
+        return errorCode;
+    }
+
+    public void setErrorCode(String errorCode) {
+        this.errorCode = errorCode;
+        this.code = errorCode;
     }
 
     public List<FieldErrorDetail> getErrors() {

@@ -1,5 +1,6 @@
 package com.crevolab.testseries.controller.admin;
 
+import com.crevolab.testseries.dto.admin.PdfRawTextResponseDto;
 import com.crevolab.testseries.dto.admin.TestRequestDto;
 import com.crevolab.testseries.dto.admin.TestResponseDto;
 import com.crevolab.testseries.service.AdminTestSeriesService;
@@ -61,5 +62,24 @@ public class AdminTestSeriesController {
             @PathVariable Long id,
             @RequestParam(value = "file", required = false) MultipartFile file) {
         return ResponseEntity.ok(adminTestSeriesService.uploadPdf(id, file));
+    }
+
+    // DEMO-ONLY: Temporary admin debug endpoint returning raw extracted text for a test's uploaded PDF
+    @GetMapping(value = {"/{id}/raw-text", "/{id}/extract-text"}, produces = MediaType.APPLICATION_JSON_VALUE)
+    public ResponseEntity<PdfRawTextResponseDto> getRawExtractedText(@PathVariable Long id) {
+        return ResponseEntity.ok(adminTestSeriesService.getRawExtractedText(id));
+    }
+
+    // DEMO-ONLY: Temporary admin debug endpoint returning plain text
+    @GetMapping(value = {"/{id}/raw-text", "/{id}/extract-text"}, produces = MediaType.TEXT_PLAIN_VALUE)
+    public ResponseEntity<String> getRawExtractedTextPlain(@PathVariable Long id) {
+        return ResponseEntity.ok(adminTestSeriesService.getRawExtractedText(id).getRawText());
+    }
+
+    // DEMO-ONLY: Temporary admin debug endpoint returning raw extracted text directly from an uploaded PDF
+    @PostMapping(value = "/debug/extract-text", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<PdfRawTextResponseDto> debugExtractText(
+            @RequestParam(value = "file", required = false) MultipartFile file) {
+        return ResponseEntity.ok(adminTestSeriesService.debugExtractText(file));
     }
 }

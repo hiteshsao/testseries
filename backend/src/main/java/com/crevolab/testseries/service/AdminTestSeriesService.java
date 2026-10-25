@@ -2,11 +2,12 @@ package com.crevolab.testseries.service;
 
 import com.crevolab.testseries.domain.TestSeries;
 import com.crevolab.testseries.domain.enums.AccessType;
+import com.crevolab.testseries.dto.admin.AdminStatsDto;
+import com.crevolab.testseries.dto.admin.PdfRawTextResponseDto;
 import com.crevolab.testseries.dto.admin.TestRequestDto;
 import com.crevolab.testseries.dto.admin.TestResponseDto;
-import com.crevolab.testseries.exception.ResourceNotFoundException;
 import com.crevolab.testseries.domain.enums.TestStatus;
-import com.crevolab.testseries.dto.admin.AdminStatsDto;
+import com.crevolab.testseries.exception.ResourceNotFoundException;
 import com.crevolab.testseries.repository.AttemptRepository;
 import com.crevolab.testseries.repository.TestSeriesRepository;
 import org.springframework.stereotype.Service;
@@ -30,10 +31,14 @@ public class AdminTestSeriesService {
 
     private final TestSeriesRepository testSeriesRepository;
     private final AttemptRepository attemptRepository;
+    private final PdfTextExtractionService pdfTextExtractionService;
 
-    public AdminTestSeriesService(TestSeriesRepository testSeriesRepository, AttemptRepository attemptRepository) {
+    public AdminTestSeriesService(TestSeriesRepository testSeriesRepository,
+                                  AttemptRepository attemptRepository,
+                                  PdfTextExtractionService pdfTextExtractionService) {
         this.testSeriesRepository = testSeriesRepository;
         this.attemptRepository = attemptRepository;
+        this.pdfTextExtractionService = pdfTextExtractionService;
     }
 
     @Transactional(readOnly = true)
@@ -159,6 +164,52 @@ public class AdminTestSeriesService {
         TestSeries updated = testSeriesRepository.save(test);
 
         return TestResponseDto.fromEntity(updated);
+    }
+
+    // DEMO-ONLY: Debug endpoint to extract raw text for a test's uploaded PDF
+    @Transactional(readOnly = true)
+    public PdfRawTextResponseDto getRawExtractedText(Long id) {
+        TestSeries test = testSeriesRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Test not found with id: " + id));
+
+        String pdfPath = test.getSourcePdfPath();
+        if (pdfPath == null || pdfPath.isBlank()) {
+            throw new IllegalArgumentException("No PDF has been uploaded for test id: " + id);
+        }
+
+        Path path = Paths.get(pdfPath);
+        if (!Files.exists(path)) {
+            throw new ResourceNotFoundException("Uploaded PDF file not found at: " + pdfPath);
+        }
+
+        PdfTextExtractionService.ExtractionResult result = pdfTextExtractionService.extractTextWithMetadata(path);
+        return new PdfRawTextResponseDto(
+                test.getId(),
+                test.getSourcePdfPath(),
+                result.text(),
+                result.pageCount(),
+                result.characterCount()
+        );
+    }
+
+    // DEMO-ONLY: Direct debug text extraction from an uploaded file
+    public PdfRawTextResponseDto debugExtractText(MultipartFile file) {
+        if (file == null || file.isEmpty()) {
+            throw new IllegalArgumentException("File is required and cannot be empty");
+        }
+        try {
+            byte[] bytes = file.getBytes();
+            PdfTextExtractionService.ExtractionResult result = pdfTextExtractionService.extractTextWithMetadata(bytes);
+            return new PdfRawTextResponseDto(
+                    null,
+                    file.getOriginalFilename(),
+                    result.text(),
+                    result.pageCount(),
+                    result.characterCount()
+            );
+        } catch (IOException e) {
+            throw new RuntimeException("Failed to read file: " + e.getMessage(), e);
+        }
     }
 
     private void mapDtoToEntity(TestRequestDto dto, TestSeries entity) {

@@ -88,4 +88,10 @@ export const adminApi = {
     });
     return handleResponse<TestSeries>(res);
   },
+
+  // DEMO-ONLY: Debug endpoint to get raw extracted text
+  async getRawText(id: number): Promise<{ testId: number; sourcePdfPath: string; rawText: string; pageCount?: number; characterCount?: number }> {
+    const res = await fetch(`/api/admin/tests/${id}/raw-text`);
+    return handleResponse<{ testId: number; sourcePdfPath: string; rawText: string; pageCount?: number; characterCount?: number }>(res);
+  },
 };

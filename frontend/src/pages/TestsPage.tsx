@@ -14,7 +14,9 @@ import {
   FileQuestion,
   AlertCircle,
   CheckCircle2,
-  Clock
+  Clock,
+  FileText,
+  X
 } from 'lucide-react';
 
 export const TestsPage: React.FC = () => {
@@ -28,6 +30,52 @@ export const TestsPage: React.FC = () => {
   const [uploadingId, setUploadingId] = useState<number | null>(null);
   const [selectedTestForUpload, setSelectedTestForUpload] = useState<number | null>(null);
   const fileInputRef = React.useRef<HTMLInputElement | null>(null);
+
+  // DEMO-ONLY: Debug raw text modal state
+  const [debugModal, setDebugModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    loading: boolean;
+    text: string | null;
+    error: string | null;
+    meta?: { pages?: number; chars?: number };
+  }>({
+    isOpen: false,
+    title: '',
+    loading: false,
+    text: null,
+    error: null,
+  });
+
+  const handleViewRawText = async (testId: number, testTitle: string) => {
+    setDebugModal({
+      isOpen: true,
+      title: testTitle,
+      loading: true,
+      text: null,
+      error: null,
+    });
+
+    try {
+      const res = await adminApi.getRawText(testId);
+      setDebugModal({
+        isOpen: true,
+        title: testTitle,
+        loading: false,
+        text: res.rawText,
+        error: null,
+        meta: { pages: res.pageCount, chars: res.characterCount },
+      });
+    } catch (err: any) {
+      setDebugModal({
+        isOpen: true,
+        title: testTitle,
+        loading: false,
+        text: null,
+        error: err?.response?.message || err?.message || 'Failed to extract text from PDF.',
+      });
+    }
+  };
 
   const handleUploadClick = (testId: number) => {
     setSelectedTestForUpload(testId);
@@ -286,6 +334,19 @@ export const TestsPage: React.FC = () => {
                           <span>{uploadingId === test.id ? 'Uploading...' : test.sourcePdfPath ? 'Replace PDF' : 'Upload PDF'}</span>
                         </button>
 
+                        {/* DEMO-ONLY: Debug Raw Extracted Text */}
+                        {test.sourcePdfPath && (
+                          <button
+                            type="button"
+                            className="btn-sm btn-action-ghost"
+                            onClick={() => handleViewRawText(test.id, test.title)}
+                            title="[DEMO-ONLY] View raw extracted text from PDF"
+                          >
+                            <FileText size={13} />
+                            <span>Raw Text</span>
+                          </button>
+                        )}
+
                         {/* 2. Edit Questions Action */}
                         <Link
                           to={`/tests/${test.id}/questions`}
@@ -345,6 +406,138 @@ export const TestsPage: React.FC = () => {
         style={{ display: 'none' }}
         onChange={handleFileChange}
       />
+
+      {/* DEMO-ONLY: Raw Extracted Text Modal */}
+      {debugModal.isOpen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.75)',
+          backdropFilter: 'blur(4px)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000,
+          padding: '1rem',
+        }}>
+          <div style={{
+            backgroundColor: 'var(--bg-card)',
+            border: '1px solid var(--border-subtle)',
+            borderRadius: 'var(--radius-lg)',
+            width: '100%',
+            maxWidth: '850px',
+            maxHeight: '85vh',
+            display: 'flex',
+            flexDirection: 'column',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 8px 10px -6px rgba(0, 0, 0, 0.5)',
+          }}>
+            {/* Modal Header */}
+            <div style={{
+              padding: '1.25rem 1.5rem',
+              borderBottom: '1px solid var(--border-subtle)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+            }}>
+              <div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <h3 style={{ fontSize: '1.1rem', fontWeight: 600, color: 'var(--text-primary)' }}>
+                    Raw Extracted PDF Text
+                  </h3>
+                  <span className="badge-tag" style={{ fontSize: '0.7rem', padding: '1px 6px' }}>DEMO-ONLY</span>
+                </div>
+                <p style={{ fontSize: '0.82rem', color: 'var(--text-secondary)', marginTop: '0.2rem' }}>
+                  Test: {debugModal.title}
+                </p>
+              </div>
+              <button
+                type="button"
+                className="btn-action-ghost"
+                style={{ padding: '6px', borderRadius: '50%' }}
+                onClick={() => setDebugModal((prev) => ({ ...prev, isOpen: false }))}
+              >
+                <X size={18} />
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div style={{ padding: '1.5rem', overflowY: 'auto', flex: 1 }}>
+              {debugModal.loading && (
+                <div style={{ textAlign: 'center', padding: '3rem 1rem', color: 'var(--text-muted)' }}>
+                  <RefreshCw size={24} className="spin" style={{ marginBottom: '0.5rem' }} />
+                  <p>Extracting text from PDF using PDFBox TextStripper...</p>
+                </div>
+              )}
+
+              {debugModal.error && (
+                <div className="alert-box alert-error">
+                  <AlertCircle size={22} style={{ flexShrink: 0 }} />
+                  <div>
+                    <strong>Extraction Error:</strong>
+                    <p style={{ marginTop: '0.25rem' }}>{debugModal.error}</p>
+                  </div>
+                </div>
+              )}
+
+              {debugModal.text && (
+                <div>
+                  <div style={{ display: 'flex', gap: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+                    {debugModal.meta?.pages != null && (
+                      <span className="badge-tag">
+                        Pages: <strong>{debugModal.meta.pages}</strong>
+                      </span>
+                    )}
+                    {debugModal.meta?.chars != null && (
+                      <span className="badge-tag">
+                        Characters: <strong>{debugModal.meta.chars}</strong>
+                      </span>
+                    )}
+                    <span className="badge-tag" style={{ color: 'var(--teal-primary)' }}>
+                      Sorted by Position: Enabled
+                    </span>
+                  </div>
+
+                  <pre style={{
+                    backgroundColor: 'var(--bg-input)',
+                    border: '1px solid var(--border-subtle)',
+                    borderRadius: 'var(--radius-md)',
+                    padding: '1.25rem',
+                    color: 'var(--text-primary)',
+                    fontFamily: 'monospace',
+                    fontSize: '0.85rem',
+                    lineHeight: '1.6',
+                    whiteSpace: 'pre-wrap',
+                    wordBreak: 'break-word',
+                    maxHeight: '450px',
+                    overflowY: 'auto',
+                  }}>
+                    {debugModal.text}
+                  </pre>
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div style={{
+              padding: '1rem 1.5rem',
+              borderTop: '1px solid var(--border-subtle)',
+              display: 'flex',
+              justifyContent: 'flex-end',
+            }}>
+              <button
+                type="button"
+                className="btn-secondary"
+                onClick={() => setDebugModal((prev) => ({ ...prev, isOpen: false }))}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
