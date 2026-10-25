@@ -782,3 +782,114 @@ body {
   gap: 0.5rem;
 }
 
+/* Badges */
+.badge-amber {
+  background-color: rgba(245, 158, 11, 0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.badge-green {
+  background-color: rgba(16, 185, 129, 0.15);
+  color: #34d399;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+  font-size: 0.74rem;
+  font-weight: 600;
+  padding: 0.2rem 0.6rem;
+  border-radius: 9999px;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+/* Question Review Components */
+.question-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  padding: 1.5rem;
+  margin-bottom: 1.5rem;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+  position: relative;
+}
+
+.question-card:hover {
+  border-color: rgba(20, 184, 166, 0.28);
+}
+
+.question-card.missing-answer {
+  border-left: 4px solid #f59e0b;
+}
+
+.question-card.has-answer {
+  border-left: 4px solid #10b981;
+}
+
+.option-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0.85rem;
+  border-radius: var(--radius-md);
+  background-color: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-subtle);
+  transition: all 0.15s ease;
+}
+
+.option-row:focus-within {
+  border-color: var(--teal-hover);
+  background-color: rgba(20, 184, 166, 0.04);
+}
+
+.option-row.is-correct {
+  border-color: rgba(16, 185, 129, 0.5);
+  background-color: rgba(16, 185, 129, 0.08);
+}
+
+/* Floating Toasts */
+.toast-container {
+  position: fixed;
+  bottom: 1.75rem;
+  right: 1.75rem;
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  pointer-events: none;
+}
+
+.toast-item {
+  pointer-events: auto;
+  background-color: #0f172a;
+  border: 1px solid var(--teal-primary);
+  color: var(--text-primary);
+  padding: 0.85rem 1.25rem;
+  border-radius: var(--radius-md);
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.45), 0 0 15px var(--teal-glow);
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  font-size: 0.9rem;
+  animation: slideInUp 0.25s ease forwards;
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+
